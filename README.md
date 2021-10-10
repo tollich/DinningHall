@@ -4,7 +4,6 @@ Net Programming - Laboratory №1
 
 Dinning Hal
 ---------
-##
 * Two web-servers
 * Connection between then 
 * Menu
