@@ -6,5 +6,5 @@ ADD dinninghall.py .
 
 RUN pip install requests flask
 
-EXPOSE 3000
+EXPOSE 80
 CMD ["python","-u","dinninghall.py"]
