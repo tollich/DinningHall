@@ -1,173 +1,132 @@
-import queue
-import random
-import time
-from flask import Flask, request
-import threading
+from flask import Flask, jsonify, request
 import requests
+import sys
+import time
+import random
+import concurrent.futures
 
-time_unit = 1
+ORDER_ID = 1
+number_of_tables = 5
+number_of_waiters = 3
+tables = []
+waiters = []
+orders_to_be_served = []
+SERVED_ORDERS = []
+TIME_UNIT = 20
 
-table_state0 = 'being free'
-table_state1 = 'waiting to make a order'
-table_state2 = 'waiting for the order to be served'
 
-menu = [{
-    "id": 1,
-    "name": "pizza",
-    "preparation-time": 20,
-    "complexity": 2,
-    "cooking-apparatus": "oven"
-}, {
-    "id": 2,
-    "name": "salad",
-    "preparation-time": 10,
-    "complexity": 1,
-    "cooking-apparatus": None
-}, {
-    "id": 4,
-    "name": "Scallop Sashimi with Meyer Lemon Confit",
-    "preparation-time": 32,
-    "complexity": 3,
-    "cooking-apparatus": None
-}, {
-    "id": 5,
-    "name": "Island Duck with Mulberry Mustard",
-    "preparation-time": 35,
-    "complexity": 3,
-    "cooking-apparatus": "oven"
-}, {
-    "id": 6,
-    "name": "Waffles",
-    "preparation-time": 10,
-    "complexity": 1,
-    "cooking-apparatus": "stove"
-}, {
-    "id": 7,
-    "name": "Aubergine",
-    "preparation-time": 20,
-    "complexity": 2,
-    "cooking-apparatus": None
-}, {
-    "id": 8,
-    "name": "Lasagna",
-    "preparation-time": 30,
-    "complexity": 2,
-    "cooking-apparatus": "oven"
-}, {
-    "id": 9,
-    "name": "Burger",
-    "preparation-time": 15,
-    "complexity": 1,
-    "cooking-apparatus": "oven"
-}, {
-    "id": 10,
-    "name": "Gyros",
-    "preparation-time": 15,
-    "complexity": 1,
-    "cooking-apparatus": None
-}]
+class Waiter:
+    def __init__(self, ident):
+        self.wait_time = None
+        self.order = None
+        self.orders = []
+        self.ident = ident
 
-tables = [{
-    "id": 1,
-    "name": "Table1",
-    "state": table_state0,
-    "order_id": None
-}, {
-    "id": 2,
-    "name": "Table2",
-    "state": table_state0,
-    "order_id": None
-}, {
-    "id": 3,
-    "name": "Table3",
-    "state": table_state0,
-    "order_id": None
-}, {
-    "id": 4,
-    "name": "Table4",
-    "state": table_state0,
-    "order_id": None
-}, {
-    "id": 5,
-    "name": "Table5",
-    "state": table_state0,
-    "order_id": None
-}]
+    def pick_order(self):
+        # for i in range(0, len(tables), self.ident + 1):
+        for table in tables:
+            if table.state == 1:  # tables[i].state
+                self.order = table.generate_order(self.ident)  # tables[i].generate
+                self.wait_time = random.randint(1, 4)
+                self.orders.append(self.order)
+                time.sleep(self.wait_time)
+                self.send_order()
+                # break
 
-waiters = [{
-    'id': 1,
-    'name': 'Waiter1'
-}, {
-    'id': 2,
-    'name': 'Waiter2'
-}, {
-    'id': 3,
-    'name': 'Waiter3'
-}, {
-    'id': 4,
-    'name': 'Waiter4'
-}]
+    def send_order(self):
+        res = requests.post('http://172.17.0.2:8080/get_order', json=self.order)
 
-orders = queue.Queue()
-orders.join()
-orders_bundle = []
+
+class Table:
+    def __init__(self, identification):
+        self.state = 1
+        self.id = identification
+
+    def change_state(self):
+        if self.state < 3:
+            self.state += 1
+        elif self.state == 3:
+            self.state = 1
+
+    def generate_order(self, ident):
+        seed_value = random.randrange(sys.maxsize)
+        random.seed(seed_value)
+        max_wait_time = 0
+        items = []
+
+        for _ in range(random.randint(1, 5)):
+            items.append(random.randint(1, 10))
+            for item in items:
+                if max_wait_time < foods[item]["preparation-time"]:
+                    max_wait_time = foods[item]["preparation-time"]
+
+        order = dict()
+        global ORDER_ID
+        order["id"] = ORDER_ID
+        order["items"] = items
+        order["priority"] = random.randint(1, 5)
+        order["max_wait"] = max_wait_time * 1.3
+        order["table_id"] = self.id
+        order["waiter_id"] = ident
+        ORDER_ID += 1
+
+        self.change_state()
+        return order
+
+
+for i in range(number_of_tables):
+    t = Table(i)
+    tables.append(t)
+
+for j in range(number_of_waiters):
+    w = Waiter(j)
+    waiters.append(w)
+
+foods = [{"id": 1, "name": "pizza", "preparation-time": 20, "complexity": 2, "cooking-apparatus": "oven"},
+         {"id": 2, "name": "salad", "preparation-time": 10, "complexity": 1, "cooking-apparatus": None},
+         {"id": 3, "name": "zeama", "preparation-time": 7, "complexity": 1, "cooking-apparatus": "stove"},
+         {"id": 4, "name": "Scallop", "preparation-time": 32, "complexity": 3, "cooking-apparatus": None},
+         {"id": 5, "name": "Island Duck", "preparation-time": 35, "complexity": 3, "cooking-apparatus": "oven"},
+         {"id": 6, "name": "Waffles", "preparation-time": 10, "complexity": 1, "cooking-apparatus": "stove"},
+         {"id": 7, "name": "Aubergine", "preparation-time": 20, "complexity": 2, "cooking-apparatus": None},
+         {"id": 8, "name": "Lasagna", "preparation-time": 30, "complexity": 2, "cooking-apparatus": "oven"},
+         {"id": 9, "name": "Burger", "preparation-time": 15, "complexity": 1, "cooking-apparatus": "oven"},
+         {"id": 10, "name": "Gyros", "preparation-time": 15, "complexity": 1, "cooking-apparatus": None}]
+
+
+def start(waiter):
+    waiter.pick_order()
+    return "ok"
+
 
 app = Flask(__name__)
-threads = []
 
 
-@app.route('/distribution', methods=['POST'])
-def distribution():
-    order = request.get_json()
-    print(f'Received order from kitchen. Order ID: {order["order_id"]}')
-    return {'isSuccess': True}
-
-
-class Waiter(threading.Thread):
-    def __init__(self, data, *args, **kwargs):
-        super(Waiter, self).__init__(*args, **kwargs)
-        self.id = data['id']
-        self.name = data['name']
-        self.daemon = True
-
-    def run(self):
+@app.route('/start')
+def start_hall_simulation():
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         while True:
-            self.search_order()
-
-    def search_order(self):
-        try:
-            order = orders.get()
-            orders.task_done()
-            table_id = next((i for i, table in enumerate(tables) if table['id'] == order['table_id']), None)
-            print(
-                f'Taking the order with Id: {order["id"]} and items: {order["items"]}')
-            tables[table_id]['state'] = table_state2
-            payload = dict({
-                'order_id': order['id'],
-                'table_id': order['table_id'],
-                'waiter_id': self.id,
-                'items': order['items'],
-            })
-
-            time.sleep(random.randint(2, 4) * time_unit)
-            # send order to kitchen
-            requests.post('http://localhost:3030/order', json=payload, timeout=0.0000000001)
-
-        except (queue.Empty, requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
-            pass
+            results = [executor.submit(start, waiter) for waiter in waiters]
+            for f in concurrent.futures.as_completed(results):
+                pass
 
 
-def run_dinninghall():
-    main_thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=3000, debug=False, use_reloader=False),daemon=True)
-    threads.append(main_thread)
-    for _, w in enumerate(waiters):
-        waiter_thread = Waiter(w)
-        threads.append(waiter_thread)
-    for th in threads:
-        th.start()
-    for th in threads:
-        th.join()
+@app.route('/serve_order', methods=["POST", "GET"])
+def serve_order():
+    if request.method == "POST":
+        input_json = request.get_json(force=True)
+        delivered_time = time.time()
+        input_json["time"] = (delivered_time - input_json["time"]) * TIME_UNIT
+        SERVED_ORDERS.append(input_json)
+        for table in tables:
+            SERVED_ORDERS.append(table.state)
+            if table.id == input_json["table_id"]:
+                table.change_state()
+                table.change_state()
+        return jsonify(SERVED_ORDERS)
+    else:
+        return jsonify(SERVED_ORDERS)
 
 
-if __name__ == '__main__':
-    run_dinninghall()
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=80, debug=True)
