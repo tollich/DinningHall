@@ -13,6 +13,7 @@ waiters = []
 orders_to_be_served = []
 SERVED_ORDERS = []
 TIME_UNIT = 20
+current_table = 0
 
 
 class Waiter:
@@ -21,8 +22,16 @@ class Waiter:
         self.order = None
         self.orders = []
         self.ident = ident
-
     def pick_order(self):
+        table = tables[current_table]
+        if table.state == 1:
+            self.order = table.generate_order(self.ident)  # tables[i].generate
+            self.wait_time = random.randint(1, 4)
+            self.orders.append(self.order)
+            time.sleep(self.wait_time)
+            self.send_order()
+    
+    def pick_order_old(self):
         # for i in range(0, len(tables), self.ident + 1):
         for table in tables:
             if table.state == 1:  # tables[i].state
@@ -31,7 +40,8 @@ class Waiter:
                 self.orders.append(self.order)
                 time.sleep(self.wait_time)
                 self.send_order()
-                # break
+                # Как только обработал столик, он выходит из цикла
+                break
 
     def send_order(self):
         res = requests.post('http://172.17.0.2:8080/get_order', json=self.order)
@@ -95,6 +105,9 @@ foods = [{"id": 1, "name": "pizza", "preparation-time": 20, "complexity": 2, "co
 
 def start(waiter):
     waiter.pick_order()
+    current_table = current_table + 1
+    if current_table >= number_of_tables:
+        current_table = 0
     return "ok"
 
 
@@ -108,6 +121,7 @@ def start_hall_simulation():
             results = [executor.submit(start, waiter) for waiter in waiters]
             for f in concurrent.futures.as_completed(results):
                 pass
+
 
 
 @app.route('/serve_order', methods=["POST", "GET"])
