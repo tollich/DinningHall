@@ -57,8 +57,7 @@ class Table:
         for _ in range(random.randint(1, 5)):
             items.append(random.randint(1, 10))
             for item in items:
-                if max_wait_time < foods[item]["preparation-time"]:
-                    max_wait_time = foods[item]["preparation-time"]
+                max_wait_time = foods[item]["preparation-time"]
 
         order = dict()
         global ORDER_ID
